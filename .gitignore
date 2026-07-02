@@ -42,3 +42,4 @@ supabase/.temp/
 # Docker
 docker/volumes/
 .vercel
+.env*
