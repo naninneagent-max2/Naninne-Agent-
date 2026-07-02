@@ -1,1 +1,1 @@
-export type { MemoryType, RelevantMemory } from "../core/src/types.js";
+export type { MemoryType, RelevantMemory } from "@agent-os/core";

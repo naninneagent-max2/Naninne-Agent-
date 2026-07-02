@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { embed } from "ai";
+import { embed, type EmbeddingModel } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { MemoryType, RelevantMemory } from "./types.js";
@@ -10,7 +10,7 @@ import type { MemoryType, RelevantMemory } from "./types.js";
 
 export class MemoryManager {
   private supabase: SupabaseClient;
-  private embeddingModel: ReturnType<typeof createGoogleGenerativeAI>[string] | ReturnType<typeof createOpenAI>[string];
+  private embeddingModel: EmbeddingModel<string>;
 
   constructor() {
     this.supabase = createClient(
@@ -21,12 +21,12 @@ export class MemoryManager {
     const provider = process.env.AI_PROVIDER ?? "google";
     if (provider === "openai") {
       const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      this.embeddingModel = openai.embedding("text-embedding-3-small");
+      this.embeddingModel = openai.embedding("text-embedding-3-small") as EmbeddingModel<string>;
     } else {
       const google = createGoogleGenerativeAI({
         apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
       });
-      this.embeddingModel = google.textEmbeddingModel("text-embedding-004");
+      this.embeddingModel = google.textEmbeddingModel("text-embedding-004") as EmbeddingModel<string>;
     }
   }
 
@@ -76,7 +76,7 @@ export class MemoryManager {
     // Gerar embedding
     try {
       const { embedding } = await embed({
-        model: this.embeddingModel as Parameters<typeof embed>[0]["model"],
+        model: this.embeddingModel,
         value: params.content,
       });
 
@@ -104,7 +104,7 @@ export class MemoryManager {
   }): Promise<RelevantMemory[]> {
     try {
       const { embedding } = await embed({
-        model: this.embeddingModel as Parameters<typeof embed>[0]["model"],
+        model: this.embeddingModel,
         value: params.query,
       });
 

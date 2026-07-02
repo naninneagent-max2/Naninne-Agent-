@@ -1,8 +1,8 @@
-import { Bot, Context, InlineKeyboard } from "grammy";
+import { Bot, InlineKeyboard } from "grammy";
 import { createClient } from "@supabase/supabase-js";
 import { MaestroAgent } from "@agent-os/core";
 import { MemoryManager } from "@agent-os/memory";
-import type { AgentContext, ApprovalRequest } from "@agent-os/core";
+import type { AgentContext } from "@agent-os/core";
 
 // ================================================================
 // HERMES — Bot Telegram do Mundo Roberth Agent OS

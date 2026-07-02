@@ -1,6 +1,6 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateText, generateObject } from "ai";
+import { generateText, generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import type {
   AgentContext,
@@ -16,7 +16,7 @@ import type {
 // Loop: Conversa → Intenção → Memória → Planejamento → Ferramentas → Execução → Registro
 
 export class MaestroAgent {
-  private model: ReturnType<typeof createGoogleGenerativeAI>[string] | ReturnType<typeof createOpenAI>[string];
+  private model: LanguageModel;
   private agentId: string = "maestro";
 
   constructor() {
@@ -25,12 +25,12 @@ export class MaestroAgent {
 
     if (provider === "openai") {
       const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      this.model = openai(modelName);
+      this.model = openai(modelName) as LanguageModel;
     } else {
       const google = createGoogleGenerativeAI({
         apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
       });
-      this.model = google(modelName);
+      this.model = google(modelName) as LanguageModel;
     }
   }
 
@@ -52,7 +52,7 @@ export class MaestroAgent {
 
     // 4. Gerar resposta
     const { text, usage } = await generateText({
-      model: this.model as Parameters<typeof generateText>[0]["model"],
+      model: this.model,
       system: systemPrompt,
       messages: [
         ...context.history.map((m) => ({

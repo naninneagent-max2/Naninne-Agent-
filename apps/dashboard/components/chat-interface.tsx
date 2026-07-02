@@ -7,7 +7,7 @@ import { clsx } from "clsx";
 
 interface Message {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system" | "data";
   content: string;
   createdAt?: Date;
 }
@@ -98,8 +98,8 @@ export function ChatInterface() {
   const handleQuickPrompt = (prompt: string) => {
     const syntheticEvent = {
       target: { value: prompt },
-    } as React.ChangeEvent<HTMLInputElement>;
-    handleInputChange(syntheticEvent as React.ChangeEvent<HTMLTextAreaElement>);
+    } as unknown as React.ChangeEvent<HTMLTextAreaElement>;
+    handleInputChange(syntheticEvent);
     inputRef.current?.focus();
   };
 

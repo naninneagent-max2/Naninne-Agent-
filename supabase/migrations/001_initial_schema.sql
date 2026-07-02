@@ -4,7 +4,7 @@
 -- ================================================================
 
 -- Habilitar extensões necessárias
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE EXTENSION IF NOT EXISTS "vector";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -13,7 +13,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- TABELA: users
 -- ================================================================
 CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   telegram_id BIGINT UNIQUE,
   telegram_username TEXT,
   name TEXT NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- TABELA: projects
 -- ================================================================
 CREATE TABLE IF NOT EXISTS projects (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
   description TEXT,
@@ -55,7 +55,7 @@ INSERT INTO projects (name, slug, description, type, color, icon) VALUES
 -- TABELA: agents
 -- ================================================================
 CREATE TABLE IF NOT EXISTS agents (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
   description TEXT,
@@ -89,7 +89,7 @@ INSERT INTO agents (name, slug, description, type, capabilities, risk_level) VAL
 -- TABELA: conversations
 -- ================================================================
 CREATE TABLE IF NOT EXISTS conversations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id),
   project_id UUID REFERENCES projects(id),
   channel TEXT NOT NULL DEFAULT 'dashboard' CHECK (channel IN ('telegram', 'dashboard', 'api')),
@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS conversations (
 -- TABELA: messages
 -- ================================================================
 CREATE TABLE IF NOT EXISTS messages (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
   content TEXT NOT NULL,
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS messages (
 -- TABELA: memories
 -- ================================================================
 CREATE TABLE IF NOT EXISTS memories (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id),
   project_id UUID REFERENCES projects(id),
   type TEXT NOT NULL CHECK (type IN ('profile', 'project', 'semantic', 'operational', 'procedural', 'temporal', 'tools', 'audit')),
@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS memories (
 -- TABELA: memory_chunks
 -- ================================================================
 CREATE TABLE IF NOT EXISTS memory_chunks (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   memory_id UUID REFERENCES memories(id) ON DELETE CASCADE,
   chunk_index INTEGER NOT NULL,
   content TEXT NOT NULL,
@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS memory_chunks (
 -- TABELA: memory_embeddings
 -- ================================================================
 CREATE TABLE IF NOT EXISTS memory_embeddings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   chunk_id UUID REFERENCES memory_chunks(id) ON DELETE CASCADE,
   embedding vector(1536),  -- OpenAI text-embedding-3-small / Gemini embedding
   model TEXT DEFAULT 'text-embedding-3-small',
@@ -170,7 +170,7 @@ CREATE INDEX IF NOT EXISTS memory_embeddings_vector_idx
 -- TABELA: files
 -- ================================================================
 CREATE TABLE IF NOT EXISTS files (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id),
   project_id UUID REFERENCES projects(id),
   name TEXT NOT NULL,
@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS files (
 -- TABELA: file_chunks
 -- ================================================================
 CREATE TABLE IF NOT EXISTS file_chunks (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   file_id UUID REFERENCES files(id) ON DELETE CASCADE,
   chunk_index INTEGER NOT NULL,
   content TEXT NOT NULL,
@@ -211,7 +211,7 @@ CREATE INDEX IF NOT EXISTS file_chunks_vector_idx
 -- TABELA: tasks
 -- ================================================================
 CREATE TABLE IF NOT EXISTS tasks (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id),
   project_id UUID REFERENCES projects(id),
   agent_id UUID REFERENCES agents(id),
@@ -233,7 +233,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 -- TABELA: jobs
 -- ================================================================
 CREATE TABLE IF NOT EXISTS jobs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   type TEXT NOT NULL,
   status TEXT DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'done', 'failed', 'cancelled', 'retrying')),
   agent_id UUID REFERENCES agents(id),
@@ -255,7 +255,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 -- TABELA: job_events
 -- ================================================================
 CREATE TABLE IF NOT EXISTS job_events (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
   event TEXT NOT NULL,
   data JSONB DEFAULT '{}',
@@ -266,7 +266,7 @@ CREATE TABLE IF NOT EXISTS job_events (
 -- TABELA: tool_registry
 -- ================================================================
 CREATE TABLE IF NOT EXISTS tool_registry (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT UNIQUE NOT NULL,
   description TEXT,
   category TEXT CHECK (category IN ('github', 'notion', 'supabase', 'vercel', 'telegram', 'web', 'files', 'ai', 'system')),
@@ -283,7 +283,7 @@ CREATE TABLE IF NOT EXISTS tool_registry (
 -- TABELA: tool_calls
 -- ================================================================
 CREATE TABLE IF NOT EXISTS tool_calls (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tool_name TEXT NOT NULL,
   agent_id UUID REFERENCES agents(id),
   conversation_id UUID REFERENCES conversations(id),
@@ -304,7 +304,7 @@ CREATE TABLE IF NOT EXISTS tool_calls (
 -- TABELA: approvals
 -- ================================================================
 CREATE TABLE IF NOT EXISTS approvals (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tool_call_id UUID REFERENCES tool_calls(id),
   job_id UUID REFERENCES jobs(id),
   agent_id UUID REFERENCES agents(id),
@@ -325,7 +325,7 @@ CREATE TABLE IF NOT EXISTS approvals (
 -- TABELA: notion_pages
 -- ================================================================
 CREATE TABLE IF NOT EXISTS notion_pages (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   notion_page_id TEXT UNIQUE NOT NULL,
   notion_parent_id TEXT,
   project_id UUID REFERENCES projects(id),
@@ -343,7 +343,7 @@ CREATE TABLE IF NOT EXISTS notion_pages (
 -- TABELA: github_repos
 -- ================================================================
 CREATE TABLE IF NOT EXISTS github_repos (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   github_id INTEGER UNIQUE,
   owner TEXT NOT NULL,
   repo TEXT NOT NULL,
@@ -361,7 +361,7 @@ CREATE TABLE IF NOT EXISTS github_repos (
 -- TABELA: github_issues
 -- ================================================================
 CREATE TABLE IF NOT EXISTS github_issues (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   github_issue_id INTEGER NOT NULL,
   repo_id UUID REFERENCES github_repos(id),
   number INTEGER NOT NULL,
@@ -381,7 +381,7 @@ CREATE TABLE IF NOT EXISTS github_issues (
 -- TABELA: github_pull_requests
 -- ================================================================
 CREATE TABLE IF NOT EXISTS github_pull_requests (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   github_pr_id INTEGER NOT NULL,
   repo_id UUID REFERENCES github_repos(id),
   number INTEGER NOT NULL,
@@ -402,7 +402,7 @@ CREATE TABLE IF NOT EXISTS github_pull_requests (
 -- TABELA: vercel_deployments
 -- ================================================================
 CREATE TABLE IF NOT EXISTS vercel_deployments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   vercel_deployment_id TEXT UNIQUE,
   project_name TEXT,
   url TEXT,
@@ -421,7 +421,7 @@ CREATE TABLE IF NOT EXISTS vercel_deployments (
 -- TABELA: audit_logs
 -- ================================================================
 CREATE TABLE IF NOT EXISTS audit_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_id UUID REFERENCES agents(id),
   user_id UUID REFERENCES users(id),
   action TEXT NOT NULL,
@@ -440,7 +440,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 -- TABELA: agent_settings
 -- ================================================================
 CREATE TABLE IF NOT EXISTS agent_settings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_id UUID UNIQUE REFERENCES agents(id),
   model TEXT DEFAULT 'gemini-2.0-flash-exp',
   temperature FLOAT DEFAULT 0.7 CHECK (temperature BETWEEN 0 AND 2),

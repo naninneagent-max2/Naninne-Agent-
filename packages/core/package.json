@@ -17,8 +17,6 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@agent-os/memory": "workspace:*",
-    "@agent-os/tools": "workspace:*",
     "@ai-sdk/google": "^1.0.0",
     "@ai-sdk/openai": "^1.0.0",
     "@supabase/supabase-js": "^2.47.0",
