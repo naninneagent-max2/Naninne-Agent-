@@ -1,0 +1,32 @@
+{
+  "name": "mundo-roberth-agent-os",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mundo Roberth Agent OS — Sistema Operacional de Agentes Inteligentes",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "clean": "turbo clean && rm -rf node_modules",
+    "db:migrate": "pnpm --filter @agent-os/supabase migrate",
+    "db:generate": "pnpm --filter @agent-os/supabase generate",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "supabase"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "prettier": "^3.3.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.12.0"
+}
