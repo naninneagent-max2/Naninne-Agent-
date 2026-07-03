@@ -1,8 +1,8 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText } from "ai";
-import { sbSelect, sbInsert, sbRpc, createServiceClient } from "../../../lib/supabase";
+import { streamText, tool } from "ai";
+import { z } from "zod";
+import { sbInsert, sbRpc, createServiceClient } from "../../../lib/supabase";
 import { getCurrentUser } from "../../../lib/auth";
-import { extractTaskWithLLM } from "../../../lib/notion-brain";
 import { createTask } from "../../../lib/tasks/create-task";
 
 export const maxDuration = 30;
@@ -26,7 +26,8 @@ Assistente pessoal e profissional do Roberth. Gerencia um ecossistema de agentes
 4. Para ações de risco alto, peça confirmação
 5. Nunca exponha segredos ou credenciais
 6. Se o usuário mencionar info pessoal, diga que está registrando na memória
-7. Se o usuário pedir para criar uma tarefa (ex: "cria tarefa: X", "adiciona no backlog: Y", "nova task: Z"), confirme a criação e mencione que será sincronizada com o Notion`;
+7. Quando o usuário quiser criar uma tarefa, use a tool create_task. NUNCA diga que criou uma tarefa sem ter chamado a tool primeiro.
+8. Após a tool retornar o resultado, reporte ao usuário exatamente o que aconteceu (sucesso com ID/link do Notion, ou erro).`;
 
 async function getEmbedding(text: string, apiKey: string): Promise<number[]> {
   try {
@@ -148,10 +149,60 @@ export async function POST(req: Request) {
 
     const openai = createOpenAI({ apiKey });
 
+    // Tool: create_task — LLM calls this when user wants to create a task
+    const createTaskTool = tool({
+      description: "Cria uma nova tarefa no Supabase e no Notion Hub. Use quando o usuário pedir para criar, adicionar ou anotar uma tarefa.",
+      parameters: z.object({
+        title: z.string().describe("Título curto e descritivo da tarefa"),
+        description: z.string().optional().describe("Descrição detalhada (opcional)"),
+        priority: z.enum(["low", "medium", "high", "urgent"]).default("medium").describe("Prioridade da tarefa"),
+        project: z.string().optional().describe("Nome do projeto associado (ex: RC Agropecuária, Villa Canabrava, Hermes Agent OS, Casa de Memória e Futuro, Mundo Roberth)"),
+      }),
+      execute: async ({ title, description, priority, project }) => {
+        const sb = createServiceClient();
+
+        // Resolve project_id
+        let projectId: string | undefined;
+        if (project) {
+          const { data: proj } = await sb
+            .from("projects")
+            .select("id")
+            .ilike("name", `%${project}%`)
+            .limit(1)
+            .single();
+          if (proj) projectId = proj.id;
+        }
+
+        const result = await createTask(sb, {
+          userId: userId!,
+          title,
+          description,
+          priority,
+          projectId,
+          source: "dashboard-chat",
+        });
+
+        if (result.error && !result.task.id) {
+          return { success: false, error: result.error };
+        }
+
+        return {
+          success: true,
+          task_id: result.task.id,
+          title: result.task.title,
+          status: result.task.status,
+          notion_page_id: result.notionPageId ?? null,
+          notion_url: result.notionUrl ?? null,
+        };
+      },
+    });
+
     const result = streamText({
       model: openai("gpt-4o-mini"),
       system: systemContent,
       messages: messages || [],
+      tools: { create_task: createTaskTool },
+      maxSteps: 3,
       maxTokens: 2000,
       temperature: 0.7,
       async onFinish({ text }) {
@@ -167,35 +218,6 @@ export async function POST(req: Request) {
         // Auto-remember
         if (await shouldRemember(lastUserMessage)) {
           await saveMemory(lastUserMessage, userId!, apiKey).catch(() => {});
-        }
-        // Notion Brain — detect task creation intent
-        try {
-          const taskIntent = await extractTaskWithLLM(lastUserMessage, apiKey);
-          if (taskIntent) {
-            const sb = createServiceClient();
-            // Resolve project_id if project name was detected
-            let projectId: string | undefined;
-            if (taskIntent.project) {
-              const { data: proj } = await sb
-                .from("projects")
-                .select("id")
-                .ilike("name", `%${taskIntent.project}%`)
-                .limit(1)
-                .single();
-              if (proj) projectId = proj.id;
-            }
-            await createTask(sb, {
-              userId: userId!,
-              title: taskIntent.title,
-              description: taskIntent.description,
-              priority: taskIntent.priority,
-              projectId,
-              source: "dashboard-chat",
-            });
-            console.log("[Notion Brain] Task created from chat:", taskIntent.title);
-          }
-        } catch (err) {
-          console.error("[Notion Brain] Error:", err);
         }
       },
     });
