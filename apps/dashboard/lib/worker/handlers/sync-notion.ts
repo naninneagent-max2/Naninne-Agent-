@@ -79,7 +79,7 @@ async function syncTask(
           "Descrição": {
             rich_text: [{ text: { content: task.description ?? "" } }],
           },
-        } as Record<string, unknown>,
+        } as any,
       });
 
       await sb.from("notion_pages").upsert({
