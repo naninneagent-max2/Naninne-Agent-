@@ -28,10 +28,13 @@ async function getEmbedding(text: string, apiKey: string): Promise<number[]> {
 }
 
 export async function run(
-  payload: Payload,
+  raw: Record<string, unknown>,
   ctx: { sb: SupabaseClient }
 ): Promise<{ ok: boolean; result?: unknown; error?: string }> {
-  const { user_id, content, tags, type } = payload;
+  const user_id = raw.user_id as string;
+  const content = raw.content as string;
+  const tags = raw.tags as string[] | undefined;
+  const type = raw.type as string | undefined;
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!content?.trim()) {

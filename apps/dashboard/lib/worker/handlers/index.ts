@@ -8,21 +8,19 @@ import * as executeTool from "./execute-tool";
 // Handler registry — maps job.type → handler.run()
 // ================================================================
 
-type Handler = {
-  run: (
-    payload: Record<string, unknown>,
-    ctx: { sb: SupabaseClient }
-  ) => Promise<{ ok: boolean; result?: unknown; error?: string }>;
-};
+type HandlerFn = (
+  payload: Record<string, unknown>,
+  ctx: { sb: SupabaseClient }
+) => Promise<{ ok: boolean; result?: unknown; error?: string }>;
 
-const handlers: Record<string, Handler> = {
+const handlers: Record<string, { run: HandlerFn }> = {
   send_notification: sendNotification,
   sync_notion: syncNotion,
   background_memory: backgroundMemory,
   execute_tool: executeTool,
 };
 
-export function getHandler(type: string): Handler | undefined {
+export function getHandler(type: string): { run: HandlerFn } | undefined {
   return handlers[type];
 }
 

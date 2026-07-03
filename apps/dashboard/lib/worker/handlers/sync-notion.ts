@@ -12,9 +12,10 @@ interface Payload {
 }
 
 export async function run(
-  payload: Payload,
+  raw: Record<string, unknown>,
   ctx: { sb: SupabaseClient }
 ): Promise<{ ok: boolean; result?: unknown; error?: string }> {
+  const payload = raw as unknown as Payload;
   const notionToken = process.env.NOTION_TOKEN ?? process.env.NOTION_API_TOKEN;
   const notionDbId = process.env.NOTION_HUB_DATABASE_ID;
 

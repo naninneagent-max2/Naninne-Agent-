@@ -14,10 +14,12 @@ interface Payload {
 }
 
 export async function run(
-  payload: Payload,
+  raw: Record<string, unknown>,
   _ctx: { sb: SupabaseClient }
 ): Promise<{ ok: boolean; result?: unknown; error?: string }> {
-  const { channel, message, target } = payload;
+  const channel = raw.channel as string;
+  const message = raw.message as string;
+  const target = raw.target as number | string;
 
   if (channel !== "telegram") {
     return { ok: false, error: `Unsupported channel: ${channel}` };

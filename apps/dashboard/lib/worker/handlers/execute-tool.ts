@@ -12,10 +12,12 @@ interface Payload {
 }
 
 export async function run(
-  payload: Payload,
+  raw: Record<string, unknown>,
   ctx: { sb: SupabaseClient }
 ): Promise<{ ok: boolean; result?: unknown; error?: string }> {
-  const { tool_name, tool_input, approval_id } = payload;
+  const tool_name = raw.tool_name as string;
+  const tool_input = (raw.tool_input as Record<string, unknown>) ?? {};
+  const approval_id = raw.approval_id as string | undefined;
 
   // 1. If approval is required, check status
   if (approval_id) {
