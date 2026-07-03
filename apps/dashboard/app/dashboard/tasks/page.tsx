@@ -162,7 +162,7 @@ export default function TasksPage() {
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: `${PRIO_COLORS[task.priority]}20`, color: PRIO_COLORS[task.priority], border: `1px solid ${PRIO_COLORS[task.priority]}40` }}>
                               {task.priority}
                             </span>
-                            {(task.metadata as Record<string, unknown>)?.notion_page_id && (
+                            {!!(task.metadata as Record<string, unknown>)?.notion_page_id && (
                               <a href={`https://notion.so/${String((task.metadata as Record<string, unknown>).notion_page_id).replace(/-/g, "")}`} target="_blank" rel="noopener" className="text-[10px] flex items-center gap-0.5" style={{ color: "var(--text-muted)" }}>
                                 <ExternalLink size={10} /> Notion
                               </a>

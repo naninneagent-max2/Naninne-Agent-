@@ -51,9 +51,9 @@ export default function SupabasePage() {
                   <span className="font-mono text-sm font-medium" style={{ color: "var(--text-primary)" }}>{t.name}</span>
                 </div>
                 {t.has_rls ? (
-                  <ShieldCheck size={14} style={{ color: "var(--color-success)" }} title="RLS ativo" />
+                  <ShieldCheck size={14} style={{ color: "var(--color-success)" }} />
                 ) : (
-                  <Shield size={14} style={{ color: "var(--text-muted)" }} title="RLS inativo" />
+                  <Shield size={14} style={{ color: "var(--text-muted)" }} />
                 )}
               </div>
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>
