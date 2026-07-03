@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { Client as NotionClient } from "@notionhq/client";
+import { createTask } from "../../../../lib/tasks/create-task";
+import { detectTaskIntent } from "../../../../lib/notion-brain";
 
 export const maxDuration = 25;
 export const dynamic = "force-dynamic";
@@ -14,7 +15,6 @@ const ALLOWED_IDS = (process.env.TELEGRAM_ALLOWED_USER_IDS ?? "")
   .split(",")
   .filter(Boolean)
   .map(Number);
-const NOTION_HUB_DB = process.env.NOTION_HUB_DATABASE_ID ?? "";
 
 function supabase() {
   return createClient(
@@ -22,12 +22,6 @@ function supabase() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false } }
   );
-}
-
-function notion() {
-  return new NotionClient({
-    auth: process.env.NOTION_TOKEN ?? process.env.NOTION_API_TOKEN,
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -238,71 +232,20 @@ async function cmdNova(chatId: number, userId: string, description: string) {
   }
 
   const client = sb();
+  const result = await createTask(client, {
+    userId,
+    title: description.trim(),
+    source: "telegram",
+    chatId,
+  });
 
-  // 1. Create task in Supabase
-  const { data: task, error: taskError } = await client
-    .from("tasks")
-    .insert({
-      user_id: userId,
-      title: description.trim(),
-      description: `Criada via Telegram: ${description.trim()}`,
-      status: "pending",
-      priority: "medium",
-      metadata: { source: "telegram", chat_id: chatId },
-    })
-    .select("id, title")
-    .single();
-
-  if (taskError || !task) {
-    console.error("Task creation error:", taskError);
-    return reply(chatId, `Erro ao criar tarefa: ${taskError?.message ?? "unknown"}`);
+  if (result.error) {
+    return reply(chatId, `Erro ao criar tarefa: ${result.error}`);
   }
 
-  // 2. Create page in Notion Hub Database (if configured)
-  let notionUrl = "";
-  if (NOTION_HUB_DB) {
-    try {
-      const n = notion();
-      const page = await n.pages.create({
-        parent: { database_id: NOTION_HUB_DB },
-        properties: {
-          Nome: { title: [{ text: { content: description.trim() } }] },
-          Status: { select: { name: "Backlog" } },
-          "Descrição": { rich_text: [{ text: { content: `Criada via Telegram` } }] },
-        } as Record<string, unknown>,
-        children: [
-          {
-            object: "block" as const,
-            paragraph: {
-              rich_text: [
-                {
-                  text: {
-                    content: `Tarefa criada via Telegram em ${new Date().toLocaleString("pt-BR")}`,
-                  },
-                },
-              ],
-            },
-          },
-        ] as unknown[],
-      } as Parameters<typeof n.pages.create>[0]);
-
-      notionUrl = (page as { url?: string }).url ?? "";
-
-      // Update task with notion_page_id
-      await client
-        .from("tasks")
-        .update({ metadata: { source: "telegram", chat_id: chatId, notion_page_id: page.id } })
-        .eq("id", task.id);
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      console.error("Notion page creation error:", errMsg);
-      // Task was created in Supabase, Notion failed — report partial success
-    }
-  }
-
-  let msg = `*Tarefa criada!*\n\n` + `Titulo: ${task.title}\n` + `ID: \`${task.id}\`\n` + `Status: pending`;
-  if (notionUrl) {
-    msg += `\n[Ver no Notion](${notionUrl})`;
+  let msg = `*Tarefa criada!*\n\nTitulo: ${result.task.title}\nID: \`${result.task.id}\`\nStatus: pending`;
+  if (result.notionUrl) {
+    msg += `\n[Ver no Notion](${result.notionUrl})`;
   }
 
   return reply(chatId, msg);
@@ -383,8 +326,31 @@ async function handleFreeText(
     source: "telegram",
   });
 
-  // Simple echo for now — full Maestro integration will come in 2c
-  // For MVP, use OpenAI directly
+  // Notion Brain — detect task creation intent in free text
+  const taskIntent = detectTaskIntent(text);
+  if (taskIntent) {
+    const client = sb();
+    const result = await createTask(client, {
+      userId,
+      title: taskIntent.title,
+      description: taskIntent.description,
+      priority: taskIntent.priority,
+      source: "telegram",
+      chatId,
+    });
+
+    let msg = `Tarefa criada: *${result.task.title}*\nStatus: pending`;
+    if (result.notionUrl) {
+      msg += `\n[Ver no Notion](${result.notionUrl})`;
+    }
+    if (result.error) {
+      msg += `\n(Aviso: ${result.error})`;
+    }
+    await saveMessage(conversationId, "assistant", msg, { source: "telegram" });
+    return reply(chatId, msg);
+  }
+
+  // AI response for non-task messages
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     const fallback = "Recebi sua mensagem. O processamento AI sera ativado em breve.";

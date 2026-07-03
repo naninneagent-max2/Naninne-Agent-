@@ -1,7 +1,9 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
-import { sbSelect, sbInsert, sbRpc } from "../../../lib/supabase";
+import { sbSelect, sbInsert, sbRpc, createServiceClient } from "../../../lib/supabase";
 import { getCurrentUser } from "../../../lib/auth";
+import { extractTaskWithLLM } from "../../../lib/notion-brain";
+import { createTask } from "../../../lib/tasks/create-task";
 
 export const maxDuration = 30;
 
@@ -23,7 +25,8 @@ Assistente pessoal e profissional do Roberth. Gerencia um ecossistema de agentes
 3. Use markdown quando útil
 4. Para ações de risco alto, peça confirmação
 5. Nunca exponha segredos ou credenciais
-6. Se o usuário mencionar info pessoal, diga que está registrando na memória`;
+6. Se o usuário mencionar info pessoal, diga que está registrando na memória
+7. Se o usuário pedir para criar uma tarefa (ex: "cria tarefa: X", "adiciona no backlog: Y", "nova task: Z"), confirme a criação e mencione que será sincronizada com o Notion`;
 
 async function getEmbedding(text: string, apiKey: string): Promise<number[]> {
   try {
@@ -164,6 +167,35 @@ export async function POST(req: Request) {
         // Auto-remember
         if (await shouldRemember(lastUserMessage)) {
           await saveMemory(lastUserMessage, userId!, apiKey).catch(() => {});
+        }
+        // Notion Brain — detect task creation intent
+        try {
+          const taskIntent = await extractTaskWithLLM(lastUserMessage, apiKey);
+          if (taskIntent) {
+            const sb = createServiceClient();
+            // Resolve project_id if project name was detected
+            let projectId: string | undefined;
+            if (taskIntent.project) {
+              const { data: proj } = await sb
+                .from("projects")
+                .select("id")
+                .ilike("name", `%${taskIntent.project}%`)
+                .limit(1)
+                .single();
+              if (proj) projectId = proj.id;
+            }
+            await createTask(sb, {
+              userId: userId!,
+              title: taskIntent.title,
+              description: taskIntent.description,
+              priority: taskIntent.priority,
+              projectId,
+              source: "dashboard-chat",
+            });
+            console.log("[Notion Brain] Task created from chat:", taskIntent.title);
+          }
+        } catch (err) {
+          console.error("[Notion Brain] Error:", err);
         }
       },
     });

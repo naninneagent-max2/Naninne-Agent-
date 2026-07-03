@@ -3,5 +3,8 @@
   "installCommand": "pnpm install",
   "outputDirectory": "apps/dashboard/.next",
   "framework": "nextjs",
-  "ignoreCommand": "exit 1"
+  "ignoreCommand": "exit 1",
+  "crons": [
+    { "path": "/api/cron/worker", "schedule": "*/1 * * * *" }
+  ]
 }
