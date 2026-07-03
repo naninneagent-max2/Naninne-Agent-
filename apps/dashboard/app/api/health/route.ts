@@ -12,6 +12,7 @@ export async function GET() {
 
   return NextResponse.json({
     status: dbOk ? "ok" : "degraded",
+    version: "2d-files",
     db: dbOk ? "connected" : "disconnected",
     ai: process.env.OPENAI_API_KEY ? "configured" : "not configured",
     timestamp: new Date().toISOString(),
