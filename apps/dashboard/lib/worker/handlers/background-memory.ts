@@ -41,6 +41,17 @@ export async function run(
     return { ok: false, error: "Empty content" };
   }
 
+  // Validate user_id exists in public.users (prevent FK violation)
+  const { data: userExists } = await ctx.sb
+    .from("users")
+    .select("id")
+    .eq("id", user_id)
+    .single();
+
+  if (!userExists) {
+    return { ok: false, error: `invalid_user_id: ${user_id} not found in users table` };
+  }
+
   // 1. Insert memory
   const { data: memory, error: memError } = await ctx.sb
     .from("memories")
