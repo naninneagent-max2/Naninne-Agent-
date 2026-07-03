@@ -267,7 +267,8 @@ async function cmdNova(chatId: number, userId: string, description: string) {
         parent: { database_id: NOTION_HUB_DB },
         properties: {
           Nome: { title: [{ text: { content: description.trim() } }] },
-          Status: { select: { name: "Nao Iniciado" } },
+          Status: { select: { name: "Backlog" } },
+          "Descrição": { rich_text: [{ text: { content: `Criada via Telegram` } }] },
         } as Record<string, unknown>,
         children: [
           {
