@@ -140,13 +140,17 @@ export async function POST(req: Request) {
       await sbInsert("messages", { conversation_id: conversationId, role: "user", content: lastUserMessage, metadata: msgMeta }).catch(() => {});
     }
 
-    // Handle image attachments for Vision
+    // Handle image attachments for Vision (AI SDK v4 format)
     let attachmentContext = "";
-    const imageUrls: { type: "image_url"; image_url: { url: string; detail: "low" } }[] = [];
+    const imageParts: { type: "image"; image: URL; mimeType?: string }[] = [];
     if (attachments?.length) {
       for (const att of attachments) {
         if (att.mime_type?.startsWith("image/") && att.url) {
-          imageUrls.push({ type: "image_url", image_url: { url: att.url, detail: "low" } });
+          imageParts.push({
+            type: "image",
+            image: new URL(att.url),
+            mimeType: att.mime_type,
+          });
         } else {
           // For non-image files, fetch summary from DB if available
           const sb = createServiceClient();
@@ -155,6 +159,8 @@ export async function POST(req: Request) {
             attachmentContext += `\n[Arquivo anexado: ${file.original_name}]\nResumo: ${file.summary}\n`;
           } else if (file?.processing_status === "pending" || file?.processing_status === "processing") {
             attachmentContext += `\n[Arquivo anexado: ${file.original_name} — ainda em processamento]\n`;
+          } else {
+            attachmentContext += `\n[Arquivo anexado: ${file?.original_name || att.name}]\n`;
           }
         }
       }
@@ -173,17 +179,17 @@ export async function POST(req: Request) {
 
     const openai = createOpenAI({ apiKey });
 
-    // Modify the last user message to include image URLs if any
+    // Modify the last user message to include images (AI SDK v4 CoreMessage format)
     const chatMessages = [...(messages || [])];
-    if (imageUrls.length > 0) {
+    if (imageParts.length > 0) {
       const lastIdx = chatMessages.length - 1;
       if (lastIdx >= 0 && chatMessages[lastIdx].role === "user") {
         chatMessages[lastIdx] = {
           ...chatMessages[lastIdx],
           content: [
-            { type: "text", text: chatMessages[lastIdx].content },
-            ...imageUrls,
-          ] as any,
+            { type: "text", text: String(chatMessages[lastIdx].content) },
+            ...imageParts,
+          ],
         };
       }
     }

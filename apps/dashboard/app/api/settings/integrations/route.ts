@@ -14,9 +14,11 @@ export async function GET() {
     },
     {
       name: "Notion",
-      key: "NOTION_API_TOKEN",
-      connected: !!process.env.NOTION_API_TOKEN,
-      masked: process.env.NOTION_API_TOKEN ? `****${process.env.NOTION_API_TOKEN.slice(-4)}` : null,
+      key: "NOTION_TOKEN",
+      connected: !!(process.env.NOTION_TOKEN || process.env.NOTION_API_TOKEN),
+      masked: (process.env.NOTION_TOKEN || process.env.NOTION_API_TOKEN)
+        ? `****${(process.env.NOTION_TOKEN || process.env.NOTION_API_TOKEN)!.slice(-4)}`
+        : null,
     },
     {
       name: "Telegram",
