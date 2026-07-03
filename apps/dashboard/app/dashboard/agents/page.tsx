@@ -34,6 +34,17 @@ export default function AgentsPage() {
     setLoading(false);
   }
 
+  async function toggleAgent(agentId: string, currentState: boolean) {
+    const res = await fetch("/api/agents", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: agentId, is_active: !currentState }),
+    });
+    if (res.ok) {
+      setAgents((prev) => prev.map((a) => a.id === agentId ? { ...a, is_active: !currentState } : a));
+    }
+  }
+
   return (
     <div className="flex-1 overflow-auto p-6" style={{ background: "var(--bg-base)" }}>
       <div className="mb-6">
@@ -66,9 +77,13 @@ export default function AgentsPage() {
                     <p className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>{agent.role}</p>
                   </div>
                   {agent.is_active ? (
-                    <ToggleRight size={20} style={{ color: "var(--color-success)" }} />
+                    <button onClick={(e) => { e.stopPropagation(); toggleAgent(agent.id, true); }} data-testid={`toggle-agent-${agent.id}`}>
+                      <ToggleRight size={20} style={{ color: "var(--color-success)" }} />
+                    </button>
                   ) : (
-                    <ToggleLeft size={20} style={{ color: "var(--text-muted)" }} />
+                    <button onClick={(e) => { e.stopPropagation(); toggleAgent(agent.id, false); }} data-testid={`toggle-agent-${agent.id}`}>
+                      <ToggleLeft size={20} style={{ color: "var(--text-muted)" }} />
+                    </button>
                   )}
                 </div>
                 <p className="text-xs line-clamp-2" style={{ color: "var(--text-secondary)" }}>{agent.description || "Sem descricao"}</p>

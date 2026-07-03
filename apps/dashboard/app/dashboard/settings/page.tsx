@@ -20,9 +20,14 @@ export default function SettingsPage() {
   const [confirmPw, setConfirmPw] = useState("");
   const [msg, setMsg] = useState("");
 
+  const [integrations, setIntegrations] = useState<{ name: string; key: string; connected: boolean; masked: string | null }[]>([]);
+
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(d => {
       if (d.user) { setUser(d.user); setName(d.user.name || ""); }
+    }).catch(() => {});
+    fetch("/api/settings/integrations").then(r => r.json()).then(d => {
+      if (Array.isArray(d)) setIntegrations(d);
     }).catch(() => {});
   }, []);
 
@@ -51,14 +56,6 @@ export default function SettingsPage() {
     else { const d = await res.json(); setMsg(d.error || "Erro ao alterar senha"); }
     setTimeout(() => setMsg(""), 3000);
   }
-
-  const integrations = [
-    { name: "OpenAI", status: !!process.env.NEXT_PUBLIC_SUPABASE_URL, key: "OPENAI_API_KEY" },
-    { name: "Notion", status: true, key: "NOTION_TOKEN" },
-    { name: "Telegram", status: true, key: "TELEGRAM_BOT_TOKEN" },
-    { name: "GitHub", status: true, key: "GITHUB_TOKEN" },
-    { name: "Vercel", status: true, key: "VERCEL_TOKEN" },
-  ];
 
   const tabs = [
     { key: "profile", label: "Perfil", icon: User },
@@ -124,10 +121,10 @@ export default function SettingsPage() {
             <div key={int.name} className="glass rounded-lg p-4 flex items-center justify-between">
               <div>
                 <h4 className="font-medium" style={{ color: "var(--text-primary)" }}>{int.name}</h4>
-                <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{int.key}</p>
+                <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{int.masked || "Não configurado"}</p>
               </div>
-              <span className={`agent-badge ${int.status ? "active" : "idle"}`}>
-                {int.status ? "Conectado" : "Desconectado"}
+              <span className={`agent-badge ${int.connected ? "active" : "idle"}`}>
+                {int.connected ? "Conectado" : "Desconectado"}
               </span>
             </div>
           ))}

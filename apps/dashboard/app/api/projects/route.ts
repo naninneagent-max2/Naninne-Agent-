@@ -24,10 +24,33 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
+  if (!body.name?.trim()) return NextResponse.json({ error: "Name required" }, { status: 400 });
+
+  // Generate slug
+  const baseSlug = body.name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 50);
+
   const sb = createServiceClient();
+
+  // Check for duplicate slug
+  let slug = baseSlug;
+  let attempt = 0;
+  while (true) {
+    const { data: existing } = await sb.from("projects").select("id").eq("slug", slug).limit(1);
+    if (!existing?.length) break;
+    attempt++;
+    slug = `${baseSlug}-${attempt}`;
+    if (attempt > 10) break;
+  }
+
   const { data, error } = await sb
     .from("projects")
-    .insert({ name: body.name, description: body.description })
+    .insert({ name: body.name.trim(), slug, description: body.description || null, created_by: user.sub })
     .select()
     .single();
 

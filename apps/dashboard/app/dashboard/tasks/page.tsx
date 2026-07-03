@@ -58,7 +58,7 @@ export default function TasksPage() {
     setLoading(true);
     const [tRes, jRes, pRes] = await Promise.all([
       fetch("/api/tasks").then(r => r.json()).catch(() => []),
-      fetch("/api/tasks?type=jobs").then(r => r.json()).catch(() => []),
+      fetch("/api/jobs?limit=100").then(r => r.json()).catch(() => []),
       fetch("/api/projects").then(r => r.json()).catch(() => []),
     ]);
     setTasks(Array.isArray(tRes) ? tRes : []);

@@ -5,21 +5,22 @@ import { BarChart2, RefreshCw, ExternalLink } from "lucide-react";
 
 type Deployment = {
   id: string;
-  deployment_id?: string;
-  status: string;
+  vercel_deployment_id?: string;
+  state: string;
   branch?: string;
   commit_sha?: string;
-  commit_message?: string;
+  metadata?: { commit_message?: string };
   url?: string;
+  environment?: string;
   created_at: string;
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  READY: "#22c55e", ready: "#22c55e",
-  BUILDING: "#f59e0b", building: "#f59e0b",
-  ERROR: "#ef4444", error: "#ef4444",
-  QUEUED: "#6366f1", queued: "#6366f1",
-  CANCELED: "#6b7280", canceled: "#6b7280",
+  READY: "#22c55e",
+  BUILDING: "#f59e0b",
+  ERROR: "#ef4444",
+  QUEUED: "#6366f1",
+  CANCELED: "#6b7280",
 };
 
 export default function VercelPage() {
@@ -78,14 +79,14 @@ export default function VercelPage() {
               {deploys.map(d => (
                 <tr key={d.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
                   <td className="p-3">
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: `${STATUS_COLORS[d.status] ?? "#6b7280"}20`, color: STATUS_COLORS[d.status] ?? "#6b7280" }}>
-                      {d.status}
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: `${STATUS_COLORS[d.state] ?? "#6b7280"}20`, color: STATUS_COLORS[d.state] ?? "#6b7280" }}>
+                      {d.state}
                     </span>
                   </td>
                   <td className="p-3 text-xs font-mono" style={{ color: "var(--text-muted)" }}>{d.branch ?? "-"}</td>
                   <td className="p-3 text-xs" style={{ color: "var(--text-secondary)" }}>
                     <span className="font-mono">{d.commit_sha?.slice(0, 7)}</span>
-                    {d.commit_message && <span className="ml-1" style={{ color: "var(--text-muted)" }}>{d.commit_message.slice(0, 40)}</span>}
+                    {d.metadata?.commit_message && <span className="ml-1" style={{ color: "var(--text-muted)" }}>{d.metadata.commit_message.slice(0, 40)}</span>}
                   </td>
                   <td className="p-3 text-xs">
                     {d.url && (
