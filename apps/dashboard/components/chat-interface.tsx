@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Plus, RotateCcw, Paperclip, Bot } from "lucide-react";
+import { Send, Plus, RotateCcw, Paperclip, Bot, X, FileText, Image, Loader2 } from "lucide-react";
 import { useChat } from "ai/react";
 import { clsx } from "clsx";
 
@@ -11,6 +11,13 @@ interface Message {
   content: string;
   createdAt?: Date;
 }
+
+type Attachment = {
+  file_id: string;
+  url: string;
+  name: string;
+  mime_type: string;
+};
 
 function ThinkingIndicator() {
   return (
@@ -77,9 +84,16 @@ const QUICK_PROMPTS = [
 export function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages } =
-    useChat({ api: "/api/chat" });
+    useChat({
+      api: "/api/chat",
+      body: { attachments: attachments.length > 0 ? attachments : undefined },
+      onFinish: () => setAttachments([]),
+    });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -93,7 +107,7 @@ export function ChatInterface() {
     }
   };
 
-  const clearChat = () => setMessages([]);
+  const clearChat = () => { setMessages([]); setAttachments([]); };
 
   const handleQuickPrompt = (prompt: string) => {
     const syntheticEvent = {
@@ -101,6 +115,37 @@ export function ChatInterface() {
     } as unknown as React.ChangeEvent<HTMLTextAreaElement>;
     handleInputChange(syntheticEvent);
     inputRef.current?.focus();
+  };
+
+  const handleFileAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/files/upload", { method: "POST", body: formData });
+      if (res.ok) {
+        const data = await res.json();
+        setAttachments((prev) => [...prev, {
+          file_id: data.id,
+          url: data.signed_url || "",
+          name: data.original_name || file.name,
+          mime_type: data.mime_type || file.type,
+        }]);
+      } else {
+        const err = await res.json();
+        alert(`Erro: ${err.error}`);
+      }
+    } catch {
+      alert("Erro ao anexar arquivo");
+    }
+    setUploadingFile(false);
+    e.target.value = "";
+  };
+
+  const removeAttachment = (fileId: string) => {
+    setAttachments((prev) => prev.filter((a) => a.file_id !== fileId));
   };
 
   const isEmpty = messages.length === 0;
@@ -202,13 +247,37 @@ export function ChatInterface() {
         className="px-6 py-4 border-t glass"
         style={{ borderColor: "var(--border-subtle)" }}
       >
+        {/* Attachment preview */}
+        {attachments.length > 0 && (
+          <div className="flex gap-2 mb-2 flex-wrap">
+            {attachments.map((att) => (
+              <div key={att.file_id} className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs" style={{ background: "var(--bg-overlay)", color: "var(--text-secondary)" }}>
+                {att.mime_type.startsWith("image/") ? <Image size={12} /> : <FileText size={12} />}
+                <span className="truncate max-w-[120px]">{att.name}</span>
+                <button onClick={() => removeAttachment(att.file_id)} className="ml-0.5 hover:text-red-400">
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="flex gap-3 items-end">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleFileAttach}
+          />
           <button
             type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingFile}
             className="btn-ghost p-2.5 flex-shrink-0 mb-0.5"
             title="Anexar arquivo"
+            data-testid="chat-attach-btn"
           >
-            <Paperclip size={16} />
+            {uploadingFile ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
           </button>
 
           <div className="flex-1 relative">

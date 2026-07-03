@@ -109,7 +109,7 @@ export async function POST(req: Request) {
     const userId = userPayload.sub;
 
     const body = await req.json();
-    const { messages } = body;
+    const { messages, attachments } = body;
     const lastUserMessage = messages?.findLast?.((m: any) => m.role === "user")?.content || "";
 
     if (!lastUserMessage) {
@@ -131,9 +131,33 @@ export async function POST(req: Request) {
       if (conv) conversationId = conv.id;
     } catch {}
 
-    // Save user message
+    // Save user message with attachments
+    const msgMeta: Record<string, unknown> = {};
+    if (attachments?.length) {
+      msgMeta.attachments = attachments;
+    }
     if (conversationId) {
-      await sbInsert("messages", { conversation_id: conversationId, role: "user", content: lastUserMessage }).catch(() => {});
+      await sbInsert("messages", { conversation_id: conversationId, role: "user", content: lastUserMessage, metadata: msgMeta }).catch(() => {});
+    }
+
+    // Handle image attachments for Vision
+    let attachmentContext = "";
+    const imageUrls: { type: "image_url"; image_url: { url: string; detail: "low" } }[] = [];
+    if (attachments?.length) {
+      for (const att of attachments) {
+        if (att.mime_type?.startsWith("image/") && att.url) {
+          imageUrls.push({ type: "image_url", image_url: { url: att.url, detail: "low" } });
+        } else {
+          // For non-image files, fetch summary from DB if available
+          const sb = createServiceClient();
+          const { data: file } = await sb.from("files").select("summary, original_name, processing_status").eq("id", att.file_id).single();
+          if (file?.summary) {
+            attachmentContext += `\n[Arquivo anexado: ${file.original_name}]\nResumo: ${file.summary}\n`;
+          } else if (file?.processing_status === "pending" || file?.processing_status === "processing") {
+            attachmentContext += `\n[Arquivo anexado: ${file.original_name} — ainda em processamento]\n`;
+          }
+        }
+      }
     }
 
     // Recall memories
@@ -145,9 +169,24 @@ export async function POST(req: Request) {
     }
 
     // Build system prompt with context
-    const systemContent = SYSTEM_PROMPT + memoriesText;
+    const systemContent = SYSTEM_PROMPT + memoriesText + attachmentContext;
 
     const openai = createOpenAI({ apiKey });
+
+    // Modify the last user message to include image URLs if any
+    const chatMessages = [...(messages || [])];
+    if (imageUrls.length > 0) {
+      const lastIdx = chatMessages.length - 1;
+      if (lastIdx >= 0 && chatMessages[lastIdx].role === "user") {
+        chatMessages[lastIdx] = {
+          ...chatMessages[lastIdx],
+          content: [
+            { type: "text", text: chatMessages[lastIdx].content },
+            ...imageUrls,
+          ] as any,
+        };
+      }
+    }
 
     // Tool: create_task — LLM calls this when user wants to create a task
     const createTaskTool = tool({
@@ -200,7 +239,7 @@ export async function POST(req: Request) {
     const result = streamText({
       model: openai("gpt-4o-mini"),
       system: systemContent,
-      messages: messages || [],
+      messages: chatMessages,
       tools: { create_task: createTaskTool },
       maxSteps: 3,
       maxTokens: 2000,

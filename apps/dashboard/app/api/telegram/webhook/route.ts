@@ -468,9 +468,22 @@ export async function POST(req: Request) {
     from: { id: number; first_name?: string };
     text?: string;
     message_id: number;
+    photo?: { file_id: string; file_unique_id: string; width: number; height: number }[];
+    document?: { file_id: string; file_name?: string; mime_type?: string; file_size?: number };
+    audio?: { file_id: string; file_name?: string; mime_type?: string; duration: number };
+    video?: { file_id: string; file_name?: string; mime_type?: string; duration: number };
+    voice?: { file_id: string; mime_type?: string; duration: number };
+    caption?: string;
   } | undefined;
 
-  if (!message?.text) {
+  if (!message) {
+    return NextResponse.json({ ok: true });
+  }
+
+  // Check if it's a file message (photo, document, audio, video, voice)
+  const hasFile = message.photo || message.document || message.audio || message.video || message.voice;
+
+  if (!message.text && !hasFile) {
     return NextResponse.json({ ok: true });
   }
 
@@ -494,8 +507,92 @@ export async function POST(req: Request) {
     const userId = await getOrCreateUser(fromId, fromName);
     const conversationId = await getOrCreateConversation(userId, chatId);
 
+    // 6.5 Handle file uploads (photo, document, audio, video, voice)
+    if (hasFile) {
+      try {
+        await sendTyping(chatId);
+
+        let telegramFileId: string;
+        let originalName: string;
+        let mimeType: string;
+
+        if (message.photo) {
+          // Get the largest photo
+          const photo = message.photo[message.photo.length - 1];
+          telegramFileId = photo.file_id;
+          originalName = `telegram_${Date.now()}.jpg`;
+          mimeType = "image/jpeg";
+        } else if (message.document) {
+          telegramFileId = message.document.file_id;
+          originalName = message.document.file_name || `telegram_${Date.now()}`;
+          mimeType = message.document.mime_type || "application/octet-stream";
+        } else if (message.audio) {
+          telegramFileId = message.audio.file_id;
+          originalName = message.audio.file_name || `telegram_${Date.now()}.mp3`;
+          mimeType = message.audio.mime_type || "audio/mpeg";
+        } else if (message.video) {
+          telegramFileId = message.video.file_id;
+          originalName = message.video.file_name || `telegram_${Date.now()}.mp4`;
+          mimeType = message.video.mime_type || "video/mp4";
+        } else if (message.voice) {
+          telegramFileId = message.voice.file_id;
+          originalName = `telegram_voice_${Date.now()}.ogg`;
+          mimeType = message.voice.mime_type || "audio/ogg";
+        } else {
+          return NextResponse.json({ ok: true });
+        }
+
+        // Get file path from Telegram
+        const fileInfo = await tg("getFile", { file_id: telegramFileId });
+        const filePath = fileInfo?.result?.file_path;
+        if (!filePath) {
+          await reply(chatId, "Erro ao obter arquivo do Telegram.");
+          return NextResponse.json({ ok: true });
+        }
+
+        // Download the file
+        const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
+        const fileRes = await fetch(fileUrl);
+        if (!fileRes.ok) {
+          await reply(chatId, "Erro ao baixar arquivo do Telegram.");
+          return NextResponse.json({ ok: true });
+        }
+
+        const buffer = Buffer.from(await fileRes.arrayBuffer());
+
+        // Upload using the unified service
+        const { uploadFile } = await import("../../../../lib/files/upload-service");
+        const result = await uploadFile({
+          buffer,
+          original_name: originalName,
+          mime_type: mimeType,
+          origin: "telegram",
+          user_id: userId,
+          conversation_id: conversationId,
+        });
+
+        // Save message with file reference
+        await saveMessage(conversationId, "user", message.caption || `[Arquivo: ${originalName}]`, {
+          telegram_update_id: String(updateId),
+          source: "telegram",
+          attachments: [{ file_id: result.id, name: originalName }],
+        });
+
+        const responseMsg = `Arquivo recebido: *${result.internal_name || originalName}*\nCategoria: ${result.category}\nStatus: Sendo processado pelo worker.`;
+        await saveMessage(conversationId, "assistant", responseMsg, { source: "telegram" });
+        await reply(chatId, responseMsg);
+
+        return NextResponse.json({ ok: true });
+      } catch (fileErr: unknown) {
+        const errMsg = fileErr instanceof Error ? fileErr.message : String(fileErr);
+        console.error("[Telegram] File upload error:", errMsg);
+        await reply(chatId, `Erro ao processar arquivo: ${errMsg}`);
+        return NextResponse.json({ ok: true });
+      }
+    }
+
     // 7. Route commands
-    if (text.startsWith("/")) {
+    if (text && text.startsWith("/")) {
       const [cmd, ...args] = text.split(" ");
       const command = cmd.toLowerCase().replace("@naninne_bot", "");
 
@@ -533,7 +630,9 @@ export async function POST(req: Request) {
     }
 
     // 8. Free-text message
-    await handleFreeText(chatId, userId, conversationId, text, updateId);
+    if (text) {
+      await handleFreeText(chatId, userId, conversationId, text, updateId);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {

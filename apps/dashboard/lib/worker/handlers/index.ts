@@ -3,6 +3,7 @@ import * as sendNotification from "./send-notification";
 import * as syncNotion from "./sync-notion";
 import * as backgroundMemory from "./background-memory";
 import * as executeTool from "./execute-tool";
+import * as processFile from "./process-file";
 
 // ================================================================
 // Handler registry — maps job.type → handler.run()
@@ -18,6 +19,7 @@ const handlers: Record<string, { run: HandlerFn }> = {
   sync_notion: syncNotion,
   background_memory: backgroundMemory,
   execute_tool: executeTool,
+  process_file: processFile,
 };
 
 export function getHandler(type: string): { run: HandlerFn } | undefined {
